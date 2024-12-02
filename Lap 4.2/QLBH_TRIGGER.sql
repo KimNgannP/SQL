@@ -1,0 +1,84 @@
+-- 11. Tìm các số hóa đơn đã mua sản phẩm có mã số “BB01” hoặc “BB02”.
+CREATE TRIGGER TRG_HD_KH ON HOADON FOR INSERT
+AS
+BEGIN
+	DECLARE @NGHD SMALLDATETIME, @NGDK SMALLDATETIME, @MAKH CHAR(4)
+	SELECT @NGHD = NGHD, @MAKH = MAKH FROM INSERTED
+	SELECT	@NGDK = NGDK FROM KHACHHANG WHERE MAKH = @MAKH
+
+	PRINT @NGHD 
+	PRINT @NGDK
+
+	IF (@NGHD >= @NGDK)
+		PRINT N'Thêm mới một hóa đơn thành công.'
+	ELSE
+	BEGIN
+		PRINT N'Lỗi: Ngày mua hàng của một khách hàng thành viên sẽ lớn hơn hoặc bằng ngày khách hàng đó đăng ký thành viên.'
+		ROLLBACK TRANSACTION
+	END
+END
+
+
+--12. Tìm các số hóa đơn đã mua sản phẩm có mã số “BB01” hoặc “BB02”, mỗi sản phẩm mua với số lượng từ 10 đến 20.
+CREATE TRIGGER TRG_HD_NV ON HOADON FOR INSERT
+AS
+BEGIN
+	DECLARE @NGHD SMALLDATETIME, @NGVL SMALLDATETIME, @MANV CHAR(4)
+	SELECT @NGHD = NGHD, @MANV = MANV FROM INSERTED
+	SELECT	@NGVL = NGVL FROM NHANVIEN WHERE MANV = @MANV
+
+	IF (@NGHD >= @NGVL)
+		PRINT N'Thêm mới một hóa đơn thành công.'
+	ELSE
+	BEGIN
+		PRINT N'Lỗi: Ngày bán hàng của một nhân viên phải lớn hơn hoặc bằng ngày nhân viên đó vào làm.'
+		ROLLBACK TRANSACTION
+	END
+END
+
+--13. Tìm các số hóa đơn mua cùng lúc 2 sản phẩm có mã số “BB01” và “BB02”, mỗi sản phẩm mua với số lượng từ 10 đến 20.
+CREATE TRIGGER TRG_HD_CTHD ON HOADON FOR INSERT
+AS
+BEGIN
+	DECLARE @SOHD INT, @COUNT_SOHD INT
+	SELECT @SOHD = SOHD FROM INSERTED
+	SELECT @COUNT_SOHD = COUNT(SOHD) FROM CTHD WHERE SOHD = @SOHD
+
+	IF (@COUNT_SOHD >= 1)
+		PRINT N'Thêm mới một hóa đơn thành công.'
+	ELSE
+	BEGIN
+		PRINT N'Lỗi: Mỗi một hóa đơn phải có ít nhất một chi tiết hóa đơn.'
+		ROLLBACK TRANSACTION
+	END
+END
+
+--14. In ra danh sách các sản phẩm (MASP,TENSP) do “Trung Quoc” sản xuất hoặc các sản phẩm được bán ra trong ngày 1/1/2007.
+CREATE TRIGGER TRG_CTHD ON CTHD FOR INSERT, DELETE
+AS
+BEGIN
+	DECLARE @SOHD INT, @TONGGIATRI INT
+
+	SELECT @TONGGIATRI = SUM(SL * GIA), @SOHD = SOHD 
+	FROM INSERTED INNER JOIN SANPHAM
+	ON INSERTED.MASP = SANPHAM.MASP
+	GROUP BY SOHD
+
+	UPDATE HOADON
+	SET TRIGIA += @TONGGIATRI
+	WHERE SOHD = @SOHD
+END
+
+CREATE TRIGGER TR_DEL_CTHD ON CTHD FOR DELETE
+AS
+BEGIN
+	DECLARE @SOHD INT, @GIATRI INT
+
+	SELECT @SOHD = SOHD, @GIATRI = SL * GIA 
+	FROM DELETED INNER JOIN SANPHAM 
+	ON SANPHAM.MASP = DELETED.MASP
+
+	UPDATE HOADON
+	SET TRIGIA -= @GIATRI
+	WHERE SOHD = @SOHD
+END
